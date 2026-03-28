@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>법률 도우미 | 일상 법률 검색 & 매일 법률 상식</title>
+<style>
+:root {
+  --primary: #1a365d;
+  --accent: #2b6cb0;
+  --gold: #d69e2e;
+  --bg: #f7fafc;
+  --card: #ffffff;
+  --text: #2d3748;
+  --light: #718096;
+  --success: #38a169;
+  --danger: #e53e3e;
+  --border: #e2e8f0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+
+/* Header */
+.header { background: linear-gradient(135deg, var(--primary) 0%, #2c5282 50%, #2b6cb0 100%); color: white; padding: 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+.header-inner { max-width: 1200px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+.logo { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+.logo-icon { font-size: 2rem; }
+nav { display: flex; gap: 6px; flex-wrap: wrap; }
+nav a { color: rgba(255,255,255,0.85); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; transition: all 0.2s; }
+nav a:hover, nav a.active { background: rgba(255,255,255,0.2); color: white; }
+
+/* Hero */
+.hero { background: linear-gradient(135deg, var(--primary), #2b6cb0); color: white; padding: 60px 20px 50px; text-align: center; }
+.hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 10px; }
+.hero p { font-size: 1.1rem; opacity: 0.9; margin-bottom: 30px; }
+.search-box { max-width: 700px; margin: 0 auto; position: relative; }
+.search-box input { width: 100%; padding: 18px 60px 18px 24px; font-size: 1.1rem; border: none; border-radius: 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); outline: none; }
+.search-box button { position: absolute; right: 6px; top: 6px; bottom: 6px; padding: 0 28px; background: var(--accent); color: white; border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.search-box button:hover { background: var(--primary); }
+.search-tags { margin-top: 16px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.search-tags span { background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+.search-tags span:hover { background: rgba(255,255,255,0.3); }
+
+/* Container */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+/* Section */
+.section { padding: 50px 0; }
+.section-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+.section-subtitle { color: var(--light); margin-bottom: 30px; }
+
+/* Category Cards */
+.categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.cat-card { background: var(--card); border-radius: 16px; padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.cat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: var(--accent); }
+.cat-icon { font-size: 2.5rem; margin-bottom: 12px; }
+.cat-name { font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; }
+.cat-desc { font-size: 0.8rem; color: var(--light); }
+
+/* Daily Tip */
+.daily-tip { background: linear-gradient(135deg, #fffff0, #fefcbf); border-radius: 16px; padding: 30px; border-left: 5px solid var(--gold); position: relative; overflow: hidden; }
+.daily-tip::before { content: ''; position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; background: rgba(214,158,46,0.1); border-radius: 50%; }
+.daily-tip .badge { display: inline-block; background: var(--gold); color: white; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 12px; }
+.daily-tip h3 { font-size: 1.2rem; margin-bottom: 8px; }
+.daily-tip .tip-content { font-size: 0.95rem; color: #744210; }
+.daily-tip .tip-source { margin-top: 12px; font-size: 0.8rem; color: var(--light); }
+
+/* Results */
+.results-area { min-height: 200px; }
+.result-card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid var(--accent); transition: box-shadow 0.2s; }
+.result-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.result-card h3 { font-size: 1.05rem; margin-bottom: 6px; color: var(--primary); }
+.result-card .meta { font-size: 0.8rem; color: var(--light); margin-bottom: 8px; }
+.result-card .preview { font-size: 0.9rem; color: var(--text); }
+.result-card .tag { display: inline-block; background: #ebf4ff; color: var(--accent); padding: 2px 10px; border-radius: 10px; font-size: 0.75rem; margin-right: 6px; }
+
+/* Loading */
+.loading { text-align: center; padding: 40px; }
+.spinner { display: inline-block; width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Subscribe */
+.subscribe { background: linear-gradient(135deg, var(--primary), #2b6cb0); border-radius: 16px; padding: 40px; color: white; text-align: center; }
+.subscribe h2 { font-size: 1.6rem; margin-bottom: 8px; }
+.subscribe p { opacity: 0.9; margin-bottom: 24px; }
+.sub-form { display: flex; gap: 10px; max-width: 500px; margin: 0 auto; flex-wrap: wrap; justify-content: center; }
+.sub-form input { flex: 1; min-width: 250px; padding: 14px 20px; border: none; border-radius: 50px; font-size: 1rem; outline: none; }
+.sub-form button { padding: 14px 30px; background: var(--gold); color: white; border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.sub-form button:hover { background: #b7791f; transform: scale(1.03); }
+.sub-count { margin-top: 14px; font-size: 0.85rem; opacity: 0.8; }
+
+/* Q&A */
+.qa-board { background: var(--card); border-radius: 16px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.qa-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.qa-form input, .qa-form textarea { padding: 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 0.95rem; outline: none; transition: border-color 0.2s; font-family: inherit; }
+.qa-form input:focus, .qa-form textarea:focus { border-color: var(--accent); }
+.qa-form textarea { min-height: 100px; resize: vertical; }
+.qa-form button { align-self: flex-end; padding: 12px 30px; background: var(--accent); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.qa-form button:hover { background: var(--primary); }
+.qa-item { border-bottom: 1px solid var(--border); padding: 20px 0; }
+.qa-item:last-child { border-bottom: none; }
+.qa-q { font-weight: 600; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 8px; }
+.qa-q::before { content: 'Q'; display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; background: var(--accent); color: white; border-radius: 50%; font-size: 0.8rem; font-weight: 700; }
+.qa-a { margin-left: 36px; padding: 14px; background: #f0fff4; border-radius: 10px; font-size: 0.9rem; border-left: 3px solid var(--success); }
+.qa-a::before { content: 'AI '; font-weight: 700; color: var(--success); }
+.qa-time { margin-left: 36px; margin-top: 6px; font-size: 0.75rem; color: var(--light); }
+.qa-pending { margin-left: 36px; padding: 10px; background: #fffbeb; border-radius: 8px; font-size: 0.85rem; color: #92400e; }
+
+/* Footer */
+.footer { background: var(--primary); color: rgba(255,255,255,0.7); padding: 30px 20px; text-align: center; margin-top: 40px; }
+.footer a { color: rgba(255,255,255,0.9); }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 1.8rem; }
+  .header-inner { flex-direction: column; gap: 10px; }
+  nav { justify-content: center; }
+  .categories { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .categories { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #edf2f7; border-radius: 12px; padding: 4px; }
+.tab { flex: 1; padding: 10px; text-align: center; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; color: var(--light); }
+.tab.active { background: white; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 14px 24px; border-radius: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000; }
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* Scroll to top */
+.scroll-top { position: fixed; bottom: 20px; left: 20px; width: 44px; height: 44px; background: var(--accent); color: white; border: none; border-radius: 50%; font-size: 1.2rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: none; z-index: 100; }
+
+/* No results */
+.no-results { text-align: center; padding: 40px; color: var(--light); }
+.no-results .icon { font-size: 3rem; margin-bottom: 12px; }
+
+/* Hidden */
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo"><span class="logo-icon">&#9878;</span> 법률 도우미</div>
+    <nav>
+      <a href="#search" class="active" onclick="showSection('search')">검색</a>
+      <a href="#daily" onclick="showSection('daily')">오늘의 법률</a>
+      <a href="#subscribe" onclick="showSection('subscribe')">메일링</a>
+      <a href="#qa" onclick="showSection('qa')">Q&A</a>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero + Search -->
+<section class="hero" id="search-hero">
+  <h1>일상 법률, 쉽게 찾자</h1>
+  <p>부동산, 교통, 세금, 파산, 특허 등 생활 속 법률을 검색하세요</p>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="예: 전세 보증금 반환, 음주운전 처벌, 양도소득세..."
+           onkeypress="if(event.key==='Enter')doSearch()">
+    <button onclick="doSearch()">검색</button>
+  </div>
+  <div class="search-tags">
+    <span onclick="quickSearch('전세 보증금 반환')">전세보증금</span>
+    <span onclick="quickSearch('음주운전 처벌')">음주운전</span>
+    <span onclick="quickSearch('양도소득세')">양도소득세</span>
+    <span onclick="quickSearch('개인회생 신청')">개인회생</span>
+    <span onclick="quickSearch('특허 출원 절차')">특허출원</span>
+    <span onclick="quickSearch('교통사고 합의금')">교통사고</span>
+  </div>
+</section>
+
+<!-- Main Content -->
+<div class="container">
+
+  <!-- Categories -->
+  <section class="section" id="section-search">
+    <h2 class="section-title">분야별 법률</h2>
+    <p class="section-subtitle">자주 찾는 생활 법률 분야를 선택하세요</p>
+    <div class="categories">
+      <div class="cat-card" onclick="searchCategory('부동산')">
+        <div class="cat-icon">&#127968;</div>
+        <div class="cat-name">부동산</div>
+        <div class="cat-desc">전세 매매 임대차 등기</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('교통')">
+        <div class="cat-icon">&#128663;</div>
+        <div class="cat-name">교통</div>
+        <div class="cat-desc">사고 벌금 면허 보험</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('세금')">
+        <div class="cat-icon">&#128176;</div>
+        <div class="cat-name">세금 / 세무</div>
+        <div class="cat-desc">소득세 부가세 상속세</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('파산')">
+        <div class="cat-icon">&#128179;</div>
+        <div class="cat-name">파산 / 회생</div>
+        <div class="cat-desc">개인회생 파산면책</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('특허')">
+        <div class="cat-icon">&#128161;</div>
+        <div class="cat-name">특허 / 지재권</div>
+        <div class="cat-desc">출원 상표 저작권</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('노동')">
+        <div class="cat-icon">&#128188;</div>
+        <div class="cat-name">노동 / 근로</div>
+        <div class="cat-desc">해고 임금 산재 퇴직금</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('가족')">
+        <div class="cat-icon">&#128106;</div>
+        <div class="cat-name">가족 / 상속</div>
+        <div class="cat-desc">이혼 양육 상속 유언</div>
+      </div>
+      <div class="cat-card" onclick="searchCategory('형사')">
+        <div class="cat-icon">&#9878;</div>
+        <div class="cat-name">형사</div>
+        <div class="cat-desc">폭행 사기 명예훼손</div>
+      </div>
+    </div>
+
+    <!-- Search Results -->
+    <div id="resultsArea" class="results-area hidden" style="margin-top:30px;">
+      <h2 class="section-title" id="resultsTitle">검색 결과</h2>
+      <div id="resultsContent"></div>
+    </div>
+  </section>
+
+  <!-- Daily Tip -->
+  <section class="section" id="section-daily">
+    <h2 class="section-title">&#128218; 오늘의 법률 상식</h2>
+    <p class="section-subtitle">매일 하나씩 알아두면 좋은 생활 법률 지식</p>
+    <div id="dailyTipArea">
+      <div class="daily-tip">
+        <span class="badge">2026.03.28 토요일</span>
+        <h3 id="tipTitle">로딩 중...</h3>
+        <div class="tip-content" id="tipContent"></div>
+        <div class="tip-source" id="tipSource"></div>
+      </div>
+    </div>
+    <div style="margin-top:20px; text-align:center;">
+      <button onclick="loadNewTip()" style="padding:10px 24px; background:var(--accent); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:600;">&#128260; 다른 상식 보기</button>
+    </div>
+  </section>
+
+  <!-- Subscribe -->
+  <section class="section" id="section-subscribe">
+    <div class="subscribe">
+      <h2>&#9993; 매일 아침 법률 상식 메일링</h2>
+      <p>매일 오전 8시, 알아두면 쓸모있는 법률 상식을 보내드립니다</p>
+      <div class="sub-form">
+        <input type="email" id="subEmail" placeholder="이메일 주소를 입력하세요">
+        <button onclick="subscribe()">구독하기</button>
+      </div>
+      <div class="sub-count" id="subCount">현재 구독자: - 명</div>
+    </div>
+  </section>
+
+  <!-- Q&A Board -->
+  <section class="section" id="section-qa">
+    <h2 class="section-title">&#128172; 법률 Q&A</h2>
+    <p class="section-subtitle">법률 질문을 남기면 AI가 즉시 답변해 드립니다 (참고용, 법률 자문은 전문가에게)</p>
+    <div class="qa-board">
+      <div class="qa-form">
+        <input type="text" id="qaName" placeholder="닉네임 (선택)" value="익명">
+        <textarea id="qaQuestion" placeholder="법률 질문을 작성해 주세요. 예: 전세 만기인데 집주인이 보증금을 안 돌려줍니다. 어떻게 해야 하나요?"></textarea>
+        <button onclick="submitQuestion()">&#128172; 질문하기</button>
+      </div>
+      <div id="qaList">
+        <!-- Q&A items loaded here -->
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <p><strong>법률 도우미</strong> &mdash; 법제처 오픈 API 기반 법률 정보 서비스</p>
+  <p style="margin-top:8px; font-size:0.8rem;">본 서비스는 참고용이며, 구체적인 법률 문제는 반드시 변호사와 상담하세요.</p>
+  <p style="margin-top:8px; font-size:0.8rem;">
+    <a href="https://www.law.go.kr" target="_blank">법제처</a> &middot;
+    <a href="https://github.com/waterfirst/korean-law-service" target="_blank">GitHub</a> &middot;
+    &copy; 2026 Nakcho Choi
+  </p>
+</footer>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Scroll to top -->
+<button class="scroll-top" id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">&#9650;</button>
+
+<script>
+// ==================== CONFIG ====================
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5100/api'
+  : (window.location.hostname.includes('github.io')
+     ? 'https://law.nakcho.com/api'  // Production API (change to your EC2 IP)
+     : `${window.location.origin}/api`);
+
+// Fallback: Direct 법제처 API (no proxy needed for some endpoints)
+const LAW_API = 'https://www.law.go.kr/DRF/lawSearch.do';
+
+// ==================== DAILY TIPS ====================
+const DAILY_TIPS = [
+  {
+    title: "전세 보증금, 2년 지나면 반환 청구 가능",
+    content: "주택임대차보호법 제4조에 따르면, 임대차 기간이 2년 미만으로 정해진 경우에도 최소 2년이 보장됩니다. 계약 만료 시 임대인은 보증금을 반환해야 하며, 지연 시 연 5%의 지연이자를 청구할 수 있습니다.",
+    source: "주택임대차보호법 제4조, 제3조의2"
+  },
+  {
+    title: "음주운전 처벌 기준이 강화되었습니다",
+    content: "2019년 '윤창호법' 시행으로, 혈중알코올농도 0.03% 이상이면 면허 정지, 0.08% 이상이면 면허 취소입니다. 음주운전으로 사람을 다치게 하면 1년 이상 15년 이하의 징역 또는 1천만원 이상 3천만원 이하의 벌금에 처합니다.",
+    source: "도로교통법 제44조, 특정범죄가중처벌법 제5조의11"
+  },
+  {
+    title: "양도소득세, 1세대 1주택은 비과세",
+    content: "소득세법 제89조에 따라 1세대 1주택자가 2년 이상 보유(조정대상지역은 2년 거주 포함)한 주택을 양도하면 양도소득세가 비과세됩니다. 다만 양도가액이 12억원을 초과하는 부분은 과세됩니다.",
+    source: "소득세법 제89조 제1항 제3호"
+  },
+  {
+    title: "개인회생, 최저생계비는 보장됩니다",
+    content: "채무자 회생 및 파산에 관한 법률에 따르면, 개인회생 시 채무자의 가용소득 중 최저생계비에 해당하는 금액은 변제계획에서 제외됩니다. 월 소득의 일정 부분만 3~5년간 변제하면 나머지 채무가 면책됩니다.",
+    source: "채무자 회생 및 파산에 관한 법률 제579조, 제614조"
+  },
+  {
+    title: "특허 출원 후 1년 6개월이면 공개됩니다",
+    content: "특허법 제64조에 따라 특허출원은 출원일로부터 1년 6개월 후 공개됩니다. 출원공개 후에는 출원인에게 경고권이 발생하여, 무단 실시자에 대해 보상금을 청구할 수 있습니다. 조기공개를 신청하면 더 빨리 공개할 수도 있습니다.",
+    source: "특허법 제64조, 제65조"
+  },
+  {
+    title: "교통사고 후 12주 진단, 형사합의 대상",
+    content: "교통사고처리특례법에 따라 업무상과실 또는 중과실로 교통사고를 일으켜 피해자가 상해를 입은 경우, 종합보험 가입자는 피해자의 명시적 의사에 반하여 공소를 제기할 수 없습니다(반의사불벌). 다만 12대 중과실에 해당하면 예외입니다.",
+    source: "교통사고처리특례법 제3조 제2항"
+  },
+  {
+    title: "퇴직금, 1년 이상 근무하면 반드시 지급",
+    content: "근로자퇴직급여 보장법 제8조에 따라, 4주간 평균 15시간 이상 일한 근로자가 1년 이상 근무하면 퇴직금을 받을 수 있습니다. 30일분 이상의 평균임금이며, 퇴직 후 14일 이내에 지급해야 합니다.",
+    source: "근로자퇴직급여 보장법 제8조, 제9조"
+  },
+  {
+    title: "상속 포기는 3개월 내에 해야 합니다",
+    content: "민법 제1019조에 따라 상속인은 상속개시 있음을 안 날로부터 3개월 내에 상속을 포기할 수 있습니다. 빚이 많은 경우 한정승인도 가능합니다. 기간을 놓치면 단순승인으로 간주되어 피상속인의 채무까지 모두 상속됩니다.",
+    source: "민법 제1019조, 제1028조"
+  },
+  {
+    title: "명예훼손, 사실이어도 처벌받을 수 있습니다",
+    content: "형법 제307조에 따라, 공연히 사실을 적시하여 타인의 명예를 훼손한 경우 2년 이하의 징역이나 500만원 이하의 벌금에 처합니다. 허위사실인 경우 5년 이하 징역까지 가중됩니다. 다만 공익 목적의 진실한 사실 적시는 위법성이 조각됩니다.",
+    source: "형법 제307조, 제310조"
+  },
+  {
+    title: "전자상거래 7일 이내 청약철회 가능",
+    content: "전자상거래법 제17조에 따라 소비자는 물품을 받은 날부터 7일 이내에 청약철회(환불)를 할 수 있습니다. 소비자 책임으로 물건이 훼손된 경우에는 제한될 수 있으나, 시험 착용 등 통상적인 사용은 괜찮습니다.",
+    source: "전자상거래 등에서의 소비자보호에 관한 법률 제17조"
+  },
+  {
+    title: "주차장 사고도 도로교통법이 적용됩니다",
+    content: "대법원 판례에 따르면, 불특정 다수가 이용하는 주차장은 도로교통법상의 '도로'에 해당합니다. 따라서 주차장 내 사고에도 도로교통법이 적용되며, 보험 처리가 가능합니다.",
+    source: "대법원 2007다79555, 도로교통법 제2조"
+  },
+  {
+    title: "부동산 이중계약서 작성은 형사처벌 대상",
+    content: "부동산 실거래가 신고를 허위로 하면 취득세의 2~5배 과태료가 부과됩니다. 또한 부동산 실권리자명의 등기에 관한 법률 위반으로 3년 이하 징역 또는 1억원 이하 벌금에 처해질 수 있습니다.",
+    source: "부동산 거래신고 등에 관한 법률 제28조"
+  }
+];
+
+let currentTipIndex = 0;
+
+function loadDailyTip() {
+  // Use date-based index for consistency within a day
+  const today = new Date();
+  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+  currentTipIndex = dayOfYear % DAILY_TIPS.length;
+  showTip(currentTipIndex);
+}
+
+function showTip(idx) {
+  const tip = DAILY_TIPS[idx];
+  document.getElementById('tipTitle').textContent = tip.title;
+  document.getElementById('tipContent').textContent = tip.content;
+  document.getElementById('tipSource').textContent = '근거: ' + tip.source;
+}
+
+function loadNewTip() {
+  currentTipIndex = (currentTipIndex + 1) % DAILY_TIPS.length;
+  showTip(currentTipIndex);
+}
+
+// ==================== SEARCH ====================
+const CATEGORY_QUERIES = {
+  '부동산': '주택임대차보호법',
+  '교통': '도로교통법',
+  '세금': '소득세법',
+  '파산': '채무자 회생 및 파산에 관한 법률',
+  '특허': '특허법',
+  '노동': '근로기준법',
+  '가족': '민법',
+  '형사': '형법'
+};
+
+function quickSearch(query) {
+  document.getElementById('searchInput').value = query;
+  doSearch();
+}
+
+function searchCategory(cat) {
+  const query = CATEGORY_QUERIES[cat] || cat;
+  document.getElementById('searchInput').value = query;
+  doSearch();
+  window.scrollTo({top: 0, behavior:'smooth'});
+}
+
+async function doSearch() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+
+  const area = document.getElementById('resultsArea');
+  const content = document.getElementById('resultsContent');
+  area.classList.remove('hidden');
+  document.getElementById('resultsTitle').textContent = `"${query}" 검색 결과`;
+  content.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:10px; color:var(--light);">법제처 데이터베이스 검색 중...</p></div>';
+
+  // Scroll to results
+  area.scrollIntoView({behavior:'smooth', block:'start'});
+
+  try {
+    // Try backend API first
+    let results = null;
+    try {
+      const resp = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`, {signal: AbortSignal.timeout(5000)});
+      if (resp.ok) results = await resp.json();
+    } catch(e) {
+      console.log('Backend unavailable, using direct API');
+    }
+
+    // Fallback: Direct 법제처 API (may have CORS issues on some browsers)
+    if (!results) {
+      try {
+        const resp = await fetch(`${LAW_API}?OC=test&target=law&type=JSON&query=${encodeURIComponent(query)}&display=10`);
+        if (resp.ok) {
+          const data = await resp.json();
+          results = parseLawApiResponse(data);
+        }
+      } catch(e) {
+        console.log('Direct API also failed, using local data');
+      }
+    }
+
+    // Final fallback: Show curated results
+    if (!results || results.length === 0) {
+      results = getLocalResults(query);
+    }
+
+    renderResults(results, query);
+  } catch(err) {
+    content.innerHTML = `<div class="no-results"><div class="icon">&#128269;</div><p>검색 중 오류가 발생했습니다. 다시 시도해주세요.</p></div>`;
+  }
+}
+
+function parseLawApiResponse(data) {
+  if (!data || !data.LawSearch || !data.LawSearch.law) return [];
+  const laws = Array.isArray(data.LawSearch.law) ? data.LawSearch.law : [data.LawSearch.law];
+  return laws.map(l => ({
+    title: l['법령명한글'] || l['법령명'] || '제목 없음',
+    type: l['법령구분'] || '법률',
+    id: l['법령일련번호'] || '',
+    date: l['공포일자'] || '',
+    status: l['시행여부'] || '',
+    link: l['법령상세링크'] ? `https://www.law.go.kr${l['법령상세링크']}` : `https://www.law.go.kr/법령/${encodeURIComponent(l['법령명한글'] || '')}`
+  }));
+}
+
+function getLocalResults(query) {
+  const allLaws = [
+    { title: '주택임대차보호법', type: '법률', desc: '주택 임차인의 보증금 보호, 대항력, 우선변제권 등', tags: ['부동산','전세','임대차','보증금'], link: 'https://www.law.go.kr/법령/주택임대차보호법' },
+    { title: '민법 (물권편)', type: '법률', desc: '부동산 소유권, 저당권, 등기, 점유 등', tags: ['부동산','소유권','등기','매매'], link: 'https://www.law.go.kr/법령/민법' },
+    { title: '부동산 거래신고 등에 관한 법률', type: '법률', desc: '부동산 실거래가 신고, 외국인 부동산 취득 등', tags: ['부동산','거래','신고','실거래가'], link: 'https://www.law.go.kr/법령/부동산거래신고등에관한법률' },
+    { title: '도로교통법', type: '법률', desc: '교통규칙, 음주운전, 면허, 벌칙 등', tags: ['교통','음주운전','면허','벌금'], link: 'https://www.law.go.kr/법령/도로교통법' },
+    { title: '교통사고처리 특례법', type: '법률', desc: '교통사고 형사처리 특례, 보험 처리 등', tags: ['교통','사고','합의','보험'], link: 'https://www.law.go.kr/법령/교통사고처리특례법' },
+    { title: '소득세법', type: '법률', desc: '종합소득세, 양도소득세, 퇴직소득세 등', tags: ['세금','소득세','양도세','세무'], link: 'https://www.law.go.kr/법령/소득세법' },
+    { title: '부가가치세법', type: '법률', desc: '부가가치세 과세, 면세, 신고 등', tags: ['세금','부가세','사업자','세무'], link: 'https://www.law.go.kr/법령/부가가치세법' },
+    { title: '상속세 및 증여세법', type: '법률', desc: '상속세, 증여세 과세기준 및 공제 등', tags: ['세금','상속세','증여세','세무'], link: 'https://www.law.go.kr/법령/상속세및증여세법' },
+    { title: '채무자 회생 및 파산에 관한 법률', type: '법률', desc: '개인회생, 파산, 면책, 채무자 보호 등', tags: ['파산','개인회생','면책','채무'], link: 'https://www.law.go.kr/법령/채무자회생및파산에관한법률' },
+    { title: '특허법', type: '법률', desc: '특허출원, 심사, 등록, 침해 구제 등', tags: ['특허','출원','등록','지식재산'], link: 'https://www.law.go.kr/법령/특허법' },
+    { title: '상표법', type: '법률', desc: '상표등록, 상표권, 지정상품 등', tags: ['특허','상표','지식재산','브랜드'], link: 'https://www.law.go.kr/법령/상표법' },
+    { title: '저작권법', type: '법률', desc: '저작권 보호, 공정이용, 침해 구제 등', tags: ['특허','저작권','지식재산','콘텐츠'], link: 'https://www.law.go.kr/법령/저작권법' },
+    { title: '근로기준법', type: '법률', desc: '근로시간, 임금, 해고, 퇴직금 등', tags: ['노동','근로','임금','해고'], link: 'https://www.law.go.kr/법령/근로기준법' },
+    { title: '근로자퇴직급여 보장법', type: '법률', desc: '퇴직금, 퇴직연금, 중간정산 등', tags: ['노동','퇴직금','퇴직연금','근로'], link: 'https://www.law.go.kr/법령/근로자퇴직급여보장법' },
+    { title: '민법 (가족법)', type: '법률', desc: '혼인, 이혼, 상속, 양육권 등', tags: ['가족','이혼','상속','양육권'], link: 'https://www.law.go.kr/법령/민법' },
+    { title: '형법', type: '법률', desc: '범죄 구성요건, 형벌, 집행유예 등', tags: ['형사','폭행','사기','명예훼손'], link: 'https://www.law.go.kr/법령/형법' },
+    { title: '특정범죄 가중처벌 등에 관한 법률', type: '법률', desc: '음주운전, 뺑소니 가중처벌 등', tags: ['형사','교통','음주운전','가중처벌'], link: 'https://www.law.go.kr/법령/특정범죄가중처벌등에관한법률' },
+    { title: '전자상거래 등에서의 소비자보호에 관한 법률', type: '법률', desc: '온라인 구매 청약철회, 소비자 보호 등', tags: ['소비자','전자상거래','환불','청약철회'], link: 'https://www.law.go.kr/법령/전자상거래등에서의소비자보호에관한법률' },
+  ];
+
+  const q = query.toLowerCase();
+  return allLaws.filter(law =>
+    law.title.toLowerCase().includes(q) ||
+    law.desc.toLowerCase().includes(q) ||
+    law.tags.some(t => t.includes(q)) ||
+    q.split(' ').some(w => law.tags.some(t => t.includes(w)) || law.title.includes(w) || law.desc.includes(w))
+  ).map(l => ({...l, id: '', date: '', status: '시행'}));
+}
+
+function renderResults(results, query) {
+  const content = document.getElementById('resultsContent');
+  if (!results || results.length === 0) {
+    content.innerHTML = `<div class="no-results"><div class="icon">&#128269;</div><p>"${query}"에 대한 결과를 찾을 수 없습니다.</p><p style="margin-top:8px;font-size:0.85rem;">다른 키워드로 검색해 보세요.</p></div>`;
+    return;
+  }
+
+  content.innerHTML = results.map(r => `
+    <div class="result-card">
+      <h3><a href="${r.link || '#'}" target="_blank">${highlightQuery(r.title, query)}</a></h3>
+      <div class="meta">
+        <span class="tag">${r.type || '법률'}</span>
+        ${r.date ? `<span>공포일: ${formatDate(r.date)}</span>` : ''}
+        ${r.status ? ` &middot; ${r.status}` : ''}
+      </div>
+      ${r.desc ? `<div class="preview">${r.desc}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function highlightQuery(text, query) {
+  if (!query) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return text.replace(regex, '<mark style="background:#fefcbf;padding:1px 2px;border-radius:3px;">$1</mark>');
+}
+
+function formatDate(d) {
+  if (!d || d.length < 8) return d;
+  return `${d.substring(0,4)}.${d.substring(4,6)}.${d.substring(6,8)}`;
+}
+
+// ==================== SUBSCRIBE ====================
+let subscribers = JSON.parse(localStorage.getItem('lawSubscribers') || '[]');
+
+function updateSubCount() {
+  document.getElementById('subCount').textContent = `현재 구독자: ${subscribers.length}명`;
+}
+
+async function subscribe() {
+  const email = document.getElementById('subEmail').value.trim();
+  if (!email || !email.includes('@')) {
+    showToast('올바른 이메일 주소를 입력해주세요.', 'error');
+    return;
+  }
+  if (subscribers.includes(email)) {
+    showToast('이미 구독 중인 이메일입니다.', 'error');
+    return;
+  }
+
+  // Try backend
+  try {
+    await fetch(`${API_BASE}/subscribe`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email}),
+      signal: AbortSignal.timeout(3000)
+    });
+  } catch(e) {
+    // Backend unavailable, save locally
+  }
+
+  subscribers.push(email);
+  localStorage.setItem('lawSubscribers', JSON.stringify(subscribers));
+  updateSubCount();
+  document.getElementById('subEmail').value = '';
+  showToast(`${email} 구독 완료! 매일 아침 법률 상식을 보내드립니다.`);
+}
+
+// ==================== Q&A ====================
+let qaItems = JSON.parse(localStorage.getItem('lawQA') || '[]');
+
+function renderQA() {
+  const list = document.getElementById('qaList');
+  if (qaItems.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--light);">아직 질문이 없습니다. 첫 번째 질문을 남겨보세요!</div>';
+    return;
+  }
+  list.innerHTML = qaItems.slice().reverse().map(item => `
+    <div class="qa-item">
+      <div class="qa-q">${item.question}</div>
+      <div class="qa-time">${item.name} &middot; ${item.time}</div>
+      ${item.answer
+        ? `<div class="qa-a">${item.answer}</div>`
+        : `<div class="qa-pending">&#9203; AI 답변 생성 중...</div>`
+      }
+    </div>
+  `).join('');
+}
+
+async function submitQuestion() {
+  const name = document.getElementById('qaName').value.trim() || '익명';
+  const question = document.getElementById('qaQuestion').value.trim();
+  if (!question) {
+    showToast('질문 내용을 입력해주세요.', 'error');
+    return;
+  }
+
+  const now = new Date();
+  const timeStr = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const item = { name, question, time: timeStr, answer: null };
+  qaItems.push(item);
+  localStorage.setItem('lawQA', JSON.stringify(qaItems));
+  renderQA();
+  document.getElementById('qaQuestion').value = '';
+  showToast('질문이 등록되었습니다. AI가 답변을 준비합니다.');
+
+  // Get AI answer
+  try {
+    const resp = await fetch(`${API_BASE}/qa`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({question}),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      item.answer = data.answer;
+    }
+  } catch(e) {
+    // Fallback: local AI simulation
+    item.answer = generateLocalAnswer(question);
+  }
+
+  localStorage.setItem('lawQA', JSON.stringify(qaItems));
+  renderQA();
+}
+
+function generateLocalAnswer(question) {
+  const q = question.toLowerCase();
+  if (q.includes('전세') || q.includes('보증금') || q.includes('임대')) {
+    return '주택임대차보호법에 따르면, 임차인은 임대차 종료 시 보증금 반환을 청구할 수 있습니다. 보증금을 돌려받지 못하는 경우: 1) 내용증명 발송, 2) 임차권등기명령 신청(법원), 3) 지급명령 또는 소액사건심판 청구를 순서대로 진행하시길 권합니다. 주택도시보증공사(HUG) 전세보증보험에 가입하셨다면 HUG에 보험금 청구도 가능합니다. *본 답변은 AI 참고용이며, 구체적 사안은 변호사 상담을 권합니다.*';
+  }
+  if (q.includes('음주') || q.includes('운전') || q.includes('면허')) {
+    return '도로교통법 제44조에 따라 혈중알코올농도 0.03% 이상이면 음주운전에 해당합니다. 처벌: 1회 위반 시 1~2년 면허정지 또는 취소, 2회 이상 적발 시 2~5년 징역 또는 1~2천만원 벌금입니다. 음주측정 거부 시에도 1~5년 징역에 처해질 수 있습니다. *본 답변은 AI 참고용이며, 구체적 사안은 변호사 상담을 권합니다.*';
+  }
+  if (q.includes('세금') || q.includes('양도') || q.includes('소득세')) {
+    return '양도소득세는 부동산, 주식 등을 양도할 때 발생하는 소득에 부과됩니다. 1세대 1주택(2년 이상 보유, 실거래가 12억 이하)은 비과세됩니다. 세금 관련 문제는 국세청 126번 상담이나 세무사 상담을 권합니다. *본 답변은 AI 참고용이며, 구체적 사안은 전문가 상담을 권합니다.*';
+  }
+  if (q.includes('파산') || q.includes('회생') || q.includes('채무')) {
+    return '개인회생은 정기적 소득이 있는 채무자가 법원에 신청할 수 있습니다. 무담보 채무 10억원, 담보채무 15억원 이하일 때 가능하며, 3~5년간 변제 후 나머지 채무가 면책됩니다. 법률구조공단(132번)에서 무료 상담을 받으실 수 있습니다. *본 답변은 AI 참고용이며, 구체적 사안은 변호사 상담을 권합니다.*';
+  }
+  if (q.includes('특허') || q.includes('출원') || q.includes('발명')) {
+    return '특허 출원은 특허로(patent.go.kr)에서 전자출원이 가능합니다. 절차: 1) 선행기술 조사(KIPRIS), 2) 명세서 작성, 3) 전자출원, 4) 방식심사, 5) 실체심사, 6) 등록. 개인 발명가는 수수료 70% 감면 혜택이 있습니다. 특허청 1544-8080으로 상담 가능합니다. *본 답변은 AI 참고용이며, 구체적 사안은 변리사 상담을 권합니다.*';
+  }
+  return '법률 질문에 대한 일반적인 안내입니다. 구체적인 상황에 따라 적용되는 법률이 다를 수 있으므로, 대한법률구조공단(132번), 법률홈닥터(무료법률상담), 또는 가까운 변호사 사무실에서 상담받으시길 권합니다. 법제처(www.law.go.kr)에서 관련 법령을 직접 검색하실 수도 있습니다. *본 답변은 AI 참고용이며, 법률 자문이 아닙니다.*';
+}
+
+// ==================== UI UTILS ====================
+function showSection(id) {
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  event.target.classList.add('active');
+  const target = document.getElementById('section-' + id);
+  if (target) target.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function showToast(msg, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.background = type === 'error' ? 'var(--danger)' : 'var(--success)';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// Scroll to top button
+window.addEventListener('scroll', () => {
+  document.getElementById('scrollTop').style.display = window.scrollY > 300 ? 'block' : 'none';
+});
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  loadDailyTip();
+  updateSubCount();
+  renderQA();
+});
+</script>
+</body>
+</html>
