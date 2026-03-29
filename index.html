@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>법률 도우미 | 일상 법률 검색 & 매일 법률 상식</title>
+<title>법률 도우미 v2 | 법령 검색 · 판례 · 용어사전 · AI 상담</title>
 <style>
 :root {
   --primary: #1a365d;
@@ -149,7 +149,9 @@ nav a:hover, nav a.active { background: rgba(255,255,255,0.2); color: white; }
   <div class="header-inner">
     <div class="logo"><span class="logo-icon">&#9878;</span> 법률 도우미</div>
     <nav>
-      <a href="#search" class="active" onclick="showSection('search')">검색</a>
+      <a href="#search" class="active" onclick="showSection('search')">법령검색</a>
+      <a href="#precedent" onclick="showSection('precedent')">판례</a>
+      <a href="#terms" onclick="showSection('terms')">용어사전</a>
       <a href="#daily" onclick="showSection('daily')">오늘의 법률</a>
       <a href="#subscribe" onclick="showSection('subscribe')">메일링</a>
       <a href="#qa" onclick="showSection('qa')">Q&A</a>
@@ -233,6 +235,43 @@ nav a:hover, nav a.active { background: rgba(255,255,255,0.2); color: white; }
     </div>
   </section>
 
+  <!-- Precedent Search -->
+  <section class="section" id="section-precedent">
+    <h2 class="section-title">&#9878; 판례 검색</h2>
+    <p class="section-subtitle">대법원·헌법재판소 판례를 키워드로 검색합니다</p>
+    <div class="search-box" style="max-width:600px;">
+      <input type="text" id="precSearchInput" placeholder="예: 부당해고, 임대차 보증금, 명예훼손..."
+             onkeypress="if(event.key==='Enter')searchPrecedents()">
+      <button onclick="searchPrecedents()">판례 검색</button>
+    </div>
+    <div class="search-tags" style="margin-top:12px; justify-content:flex-start;">
+      <span onclick="quickPrecSearch('부당해고')">부당해고</span>
+      <span onclick="quickPrecSearch('전세보증금 반환')">전세보증금</span>
+      <span onclick="quickPrecSearch('교통사고 합의')">교통사고</span>
+      <span onclick="quickPrecSearch('사기')">사기</span>
+      <span onclick="quickPrecSearch('이혼 재산분할')">이혼</span>
+    </div>
+    <div id="precResults" class="results-area hidden" style="margin-top:20px;">
+      <div id="precResultsContent"></div>
+    </div>
+  </section>
+
+  <!-- Legal Terms Dictionary -->
+  <section class="section" id="section-terms">
+    <h2 class="section-title">&#128214; 법률 용어 사전</h2>
+    <p class="section-subtitle">어려운 법률 용어를 쉽게 찾아보세요 (일상용어 → 법률용어 변환 포함)</p>
+    <div class="tabs" style="max-width:400px;">
+      <div class="tab active" onclick="switchTermTab('legal')">법률 용어</div>
+      <div class="tab" onclick="switchTermTab('daily')">일상 → 법률</div>
+    </div>
+    <div class="search-box" style="max-width:600px;">
+      <input type="text" id="termSearchInput" placeholder="예: 소멸시효, 채무불이행, 월세..."
+             onkeypress="if(event.key==='Enter')searchTerms()">
+      <button onclick="searchTerms()">검색</button>
+    </div>
+    <div id="termResults" style="margin-top:20px;"></div>
+  </section>
+
   <!-- Daily Tip -->
   <section class="section" id="section-daily">
     <h2 class="section-title">&#128218; 오늘의 법률 상식</h2>
@@ -300,11 +339,13 @@ nav a:hover, nav a.active { background: rgba(255,255,255,0.2); color: white; }
 
 <script>
 // ==================== CONFIG ====================
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5100/api'
-  : (window.location.hostname.includes('github.io')
-     ? 'https://law.nakcho.com/api'  // Production API (change to your EC2 IP)
-     : `${window.location.origin}/api`);
+// API 엔드포인트 자동 감지 (EC2 IP 하드코딩 제거)
+const API_BASE = (() => {
+  const h = window.location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:5100/api';
+  if (h.includes('github.io')) return 'http://3.38.181.117:5100/api';  // EC2 (Elastic IP 설정 시 도메인으로 변경)
+  return `${window.location.protocol}//${h}:5100/api`;
+})();
 
 // Fallback: Direct 법제처 API (no proxy needed for some endpoints)
 const LAW_API = 'https://www.law.go.kr/DRF/lawSearch.do';
@@ -544,7 +585,17 @@ function formatDate(d) {
 // ==================== SUBSCRIBE ====================
 let subscribers = JSON.parse(localStorage.getItem('lawSubscribers') || '[]');
 
-function updateSubCount() {
+async function updateSubCount() {
+  // 백엔드에서 실제 구독자 수 가져오기
+  try {
+    const resp = await fetch(`${API_BASE}/subscribers/count`, {signal: AbortSignal.timeout(3000)});
+    if (resp.ok) {
+      const data = await resp.json();
+      document.getElementById('subCount').textContent = `현재 구독자: ${data.count}명`;
+      return;
+    }
+  } catch(e) {}
+  // 폴백: 로컬 데이터
   document.getElementById('subCount').textContent = `현재 구독자: ${subscribers.length}명`;
 }
 
@@ -589,10 +640,10 @@ function renderQA() {
   }
   list.innerHTML = qaItems.slice().reverse().map(item => `
     <div class="qa-item">
-      <div class="qa-q">${item.question}</div>
-      <div class="qa-time">${item.name} &middot; ${item.time}</div>
+      <div class="qa-q">${escHtml(item.question)}</div>
+      <div class="qa-time">${escHtml(item.name)} &middot; ${escHtml(item.time)}</div>
       ${item.answer
-        ? `<div class="qa-a">${item.answer}</div>`
+        ? `<div class="qa-a">${escHtml(item.answer)}</div>`
         : `<div class="qa-pending">&#9203; AI 답변 생성 중...</div>`
       }
     </div>
@@ -679,11 +730,130 @@ window.addEventListener('scroll', () => {
   document.getElementById('scrollTop').style.display = window.scrollY > 300 ? 'block' : 'none';
 });
 
+// ==================== XSS 방지 ====================
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ==================== 판례 검색 ====================
+function quickPrecSearch(q) {
+  document.getElementById('precSearchInput').value = q;
+  searchPrecedents();
+}
+
+async function searchPrecedents() {
+  const query = document.getElementById('precSearchInput').value.trim();
+  if (!query) return;
+
+  const area = document.getElementById('precResults');
+  const content = document.getElementById('precResultsContent');
+  area.classList.remove('hidden');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:10px;color:var(--light);">판례 검색 중...</p></div>';
+
+  try {
+    const resp = await fetch(`${API_BASE}/precedents?q=${encodeURIComponent(query)}`, {signal: AbortSignal.timeout(10000)});
+    if (resp.ok) {
+      const results = await resp.json();
+      if (Array.isArray(results) && results.length > 0) {
+        content.innerHTML = results.map(r => `
+          <div class="result-card" style="border-left-color:#805ad5;">
+            <h3><a href="${escHtml(r.link || '#')}" target="_blank">${escHtml(r.title || r.caseNo || '판례')}</a></h3>
+            <div class="meta">
+              <span class="tag" style="background:#faf5ff;color:#805ad5;">${escHtml(r.court || '법원')}</span>
+              ${r.date ? `<span>선고일: ${escHtml(formatDate(r.date))}</span>` : ''}
+              ${r.caseNo ? ` &middot; ${escHtml(r.caseNo)}` : ''}
+            </div>
+          </div>
+        `).join('');
+        return;
+      }
+    }
+  } catch(e) {
+    console.log('판례 검색 오류:', e);
+  }
+
+  content.innerHTML = `<div class="no-results"><div class="icon">&#9878;</div><p>"${escHtml(query)}" 판례를 찾을 수 없습니다.</p><p style="margin-top:8px;font-size:0.85rem;">법제처 API 키 등록 후 이용 가능합니다. <a href="https://www.law.go.kr/LSW/openApi.do" target="_blank">API 키 발급</a></p></div>`;
+}
+
+// ==================== 법률 용어 사전 ====================
+let termMode = 'legal';
+
+function switchTermTab(mode) {
+  termMode = mode;
+  document.querySelectorAll('#section-terms .tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  const input = document.getElementById('termSearchInput');
+  input.placeholder = mode === 'legal' ? '예: 소멸시효, 채무불이행, 선의취득...' : '예: 월세, 빚, 집주인, 계약서...';
+  input.value = '';
+  document.getElementById('termResults').innerHTML = '';
+}
+
+async function searchTerms() {
+  const query = document.getElementById('termSearchInput').value.trim();
+  if (!query) return;
+
+  const container = document.getElementById('termResults');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const endpoint = termMode === 'legal' ? '/terms' : '/terms/daily';
+  try {
+    const resp = await fetch(`${API_BASE}${endpoint}?q=${encodeURIComponent(query)}`, {signal: AbortSignal.timeout(8000)});
+    if (resp.ok) {
+      const results = await resp.json();
+      if (Array.isArray(results) && results.length > 0) {
+        if (termMode === 'legal') {
+          container.innerHTML = results.map(r => `
+            <div class="result-card" style="border-left-color:#38a169;">
+              <h3 style="color:#38a169;">${escHtml(r.term)}</h3>
+              <div class="preview">${escHtml(r.desc)}</div>
+              ${r.related && r.related.length ? `<div class="meta" style="margin-top:8px;">관련: ${r.related.map(t => `<span class="tag" style="background:#f0fff4;color:#38a169;">${escHtml(t)}</span>`).join(' ')}</div>` : ''}
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = results.map(r => `
+            <div class="result-card" style="border-left-color:#d69e2e;">
+              <h3><span style="color:var(--light);">${escHtml(r.daily)}</span> &#8594; <span style="color:#d69e2e;">${escHtml(r.legal)}</span></h3>
+            </div>
+          `).join('');
+        }
+        return;
+      }
+    }
+  } catch(e) {
+    console.log('용어 검색 오류:', e);
+  }
+
+  container.innerHTML = `<div class="no-results"><p>"${escHtml(query)}"에 대한 결과가 없습니다.</p></div>`;
+}
+
+// ==================== Q&A 백엔드 연동 ====================
+async function loadQAFromBackend() {
+  try {
+    const resp = await fetch(`${API_BASE}/qa/list?limit=20`, {signal: AbortSignal.timeout(5000)});
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.length > 0) {
+        qaItems = data.map(r => ({
+          name: r.name || '익명',
+          question: r.question,
+          answer: r.answer,
+          time: r.created_at || ''
+        }));
+        renderQA();
+      }
+    }
+  } catch(e) {}
+}
+
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
   loadDailyTip();
   updateSubCount();
   renderQA();
+  loadQAFromBackend();
 });
 </script>
 </body>
