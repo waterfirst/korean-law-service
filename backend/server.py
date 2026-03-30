@@ -9,6 +9,7 @@
 """
 
 import os, json, sqlite3, time, hashlib, subprocess, re, html
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify
@@ -29,6 +30,33 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 KOREAN_LAW_CLI = "korean-law"  # npm -g 설치된 CLI
 
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# ========== 법제처 XML API 헬퍼 ==========
+def law_api_xml(target, query=None, mst=None, display=20, extra_params=None):
+    """법제처 API를 XML로 호출하고 파싱하여 dict 리스트 반환.
+    JSON이 빈 {}를 반환하는 버그를 우회."""
+    params = {"OC": LAW_OC, "target": target, "type": "XML"}
+    if query:
+        params["query"] = query
+    if mst:
+        params["MST"] = mst
+    if display:
+        params["display"] = display
+    if extra_params:
+        params.update(extra_params)
+
+    base_url = "https://www.law.go.kr/DRF/lawService.do" if mst and not query else LAW_API_BASE
+    resp = requests.get(base_url, params=params, timeout=12)
+    resp.raise_for_status()
+    root = ET.fromstring(resp.content)
+    return root
+
+
+def xml_find_text(el, tag, default=""):
+    """XML 엘리먼트에서 태그 텍스트를 안전하게 추출"""
+    child = el.find(tag)
+    return child.text.strip() if child is not None and child.text else default
+
 
 # ========== DATABASE ==========
 def get_db():
@@ -137,34 +165,19 @@ def search_law():
         pass
 
     try:
-        resp = requests.get(LAW_API_BASE, params={
-            "OC": LAW_OC,
-            "target": "law",
-            "type": "JSON",
-            "query": query,
-            "display": 20
-        }, timeout=10)
-
-        if resp.status_code == 200:
-            data = resp.json()
-            laws = []
-            if "LawSearch" in data and "law" in data["LawSearch"]:
-                raw = data["LawSearch"]["law"]
-                if not isinstance(raw, list):
-                    raw = [raw]
-                for l in raw:
-                    laws.append({
-                        "title": l.get("법령명한글", l.get("법령명", "")),
-                        "type": l.get("법령구분", "법률"),
-                        "id": l.get("법령일련번호", ""),
-                        "mst": l.get("법령일련번호", ""),
-                        "date": l.get("공포일자", ""),
-                        "status": l.get("시행여부", ""),
-                        "link": f"https://www.law.go.kr/법령/{l.get('법령명한글', '')}"
-                    })
-            return jsonify(laws)
-        else:
-            return jsonify({"error": f"법제처 API 오류: {resp.status_code}"}), 502
+        root = law_api_xml("law", query=query, display=20)
+        laws = []
+        for el in root.findall(".//law"):
+            laws.append({
+                "title": xml_find_text(el, "법령명한글"),
+                "type": xml_find_text(el, "법령구분명", "법률"),
+                "id": xml_find_text(el, "법령일련번호"),
+                "mst": xml_find_text(el, "법령일련번호"),
+                "date": xml_find_text(el, "공포일자"),
+                "status": xml_find_text(el, "현행연혁코드"),
+                "link": f"https://www.law.go.kr/법령/{xml_find_text(el, '법령명한글')}"
+            })
+        return jsonify(laws)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -185,39 +198,36 @@ def search_precedents():
     except Exception:
         pass
 
-    # 1차: korean-law-mcp CLI
-    result = law_cli("search_precedents", query=query)
-    if "error" not in result:
-        return jsonify(result)
-
-    # 2차: 법제처 판례 직접 검색
+    # 법제처 판례 XML 직접 검색
     try:
-        resp = requests.get(LAW_API_BASE, params={
-            "OC": LAW_OC,
-            "target": "prec",
-            "type": "JSON",
-            "query": query,
-            "display": 15
-        }, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            precs = []
-            raw = data.get("PrecSearch", {}).get("prec", [])
-            if isinstance(raw, dict):
-                raw = [raw]
-            for p in raw:
-                precs.append({
-                    "title": p.get("사건명", ""),
-                    "court": p.get("법원명", ""),
-                    "date": p.get("선고일자", ""),
-                    "caseNo": p.get("사건번호", ""),
-                    "id": p.get("판례일련번호", ""),
-                    "link": f"https://www.law.go.kr/판례/{p.get('사건번호', '')}"
-                })
-            return jsonify(precs)
-        return jsonify([])
+        precs = _search_prec_xml(query)
+        # 결과 없으면 키워드 분리 재검색
+        if not precs and " " in query:
+            for kw in query.split()[:2]:
+                if len(kw) >= 2:
+                    precs = _search_prec_xml(kw)
+                    if precs:
+                        break
+        return jsonify(precs)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _search_prec_xml(query, display=15):
+    """법제처 판례 XML 검색 → 리스트 반환"""
+    root = law_api_xml("prec", query=query, display=display)
+    precs = []
+    for el in root.findall(".//prec"):
+        precs.append({
+            "title": xml_find_text(el, "사건명"),
+            "court": xml_find_text(el, "법원명"),
+            "date": xml_find_text(el, "선고일자"),
+            "caseNo": xml_find_text(el, "사건번호"),
+            "type": xml_find_text(el, "사건종류명"),
+            "id": xml_find_text(el, "판례일련번호"),
+            "link": f"https://www.law.go.kr/판례/{xml_find_text(el, '사건번호')}"
+        })
+    return precs
 
 
 # === 법령 원문 조회 ===
@@ -238,17 +248,21 @@ def get_law_text():
     if "error" not in result:
         return jsonify(result)
 
-    # 2차: 법제처 직접 API
+    # 2차: 법제처 XML 직접 API
     try:
-        resp = requests.get("https://www.law.go.kr/DRF/lawService.do", params={
-            "OC": LAW_OC,
-            "target": "law",
-            "type": "JSON",
-            "MST": mst
-        }, timeout=15)
-        if resp.status_code == 200:
-            return jsonify(resp.json())
-        return jsonify({"error": f"법제처 API 오류: {resp.status_code}"}), 502
+        root = law_api_xml("law", mst=mst)
+        # 조문 추출
+        articles = []
+        for art in root.findall(".//조문단위"):
+            content = xml_find_text(art, "조문내용")
+            if content:
+                articles.append({
+                    "조문키": xml_find_text(art, "조문키"),
+                    "조문번호": xml_find_text(art, "조문번호"),
+                    "조문내용": content,
+                })
+        law_name = xml_find_text(root, ".//법령명_한글") or xml_find_text(root, ".//법령명한글")
+        return jsonify({"법령명": law_name, "조문": articles})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -446,82 +460,57 @@ def extract_legal_keywords(question: str) -> list:
 
 
 def search_laws_for_qa(keywords: list) -> str:
-    """법제처 API로 관련 법령 검색 → 컨텍스트 텍스트 생성"""
+    """법제처 XML API로 관련 법령 검색 → 컨텍스트 텍스트 생성"""
     all_laws = []
     all_precs = []
 
-    for kw in keywords[:3]:  # 최대 3개 키워드 검색
-        # 법령 검색
+    for kw in keywords[:3]:
+        # 법령 검색 (XML)
         try:
-            resp = requests.get(LAW_API_BASE, params={
-                "OC": LAW_OC, "target": "law", "type": "JSON",
-                "query": kw, "display": 5
-            }, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw = data.get("LawSearch", {}).get("law", [])
-                if isinstance(raw, dict):
-                    raw = [raw]
-                for l in raw:
-                    name = l.get("법령명한글", "")
-                    if name and name not in [x["name"] for x in all_laws]:
-                        all_laws.append({
-                            "name": name,
-                            "type": l.get("법령구분명", ""),
-                            "mst": l.get("법령일련번호", ""),
-                            "date": l.get("공포일자", ""),
-                        })
+            root = law_api_xml("law", query=kw, display=5)
+            for el in root.findall(".//law"):
+                name = xml_find_text(el, "법령명한글")
+                if name and name not in [x["name"] for x in all_laws]:
+                    all_laws.append({
+                        "name": name,
+                        "type": xml_find_text(el, "법령구분명"),
+                        "mst": xml_find_text(el, "법령일련번호"),
+                        "date": xml_find_text(el, "공포일자"),
+                    })
         except Exception:
             pass
 
-        # 판례 검색
+        # 판례 검색 (XML)
         try:
-            resp = requests.get(LAW_API_BASE, params={
-                "OC": LAW_OC, "target": "prec", "type": "JSON",
-                "query": kw, "display": 3
-            }, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw = data.get("PrecSearch", {}).get("prec", [])
-                if isinstance(raw, dict):
-                    raw = [raw]
-                for p in raw:
-                    case_name = p.get("사건명", "")
-                    if case_name:
-                        all_precs.append({
-                            "name": case_name,
-                            "court": p.get("법원명", ""),
-                            "date": p.get("선고일자", ""),
-                            "caseNo": p.get("사건번호", ""),
-                        })
+            root = law_api_xml("prec", query=kw, display=3)
+            for el in root.findall(".//prec"):
+                case_name = xml_find_text(el, "사건명")
+                if case_name:
+                    all_precs.append({
+                        "name": case_name,
+                        "court": xml_find_text(el, "법원명"),
+                        "date": xml_find_text(el, "선고일자"),
+                        "caseNo": xml_find_text(el, "사건번호"),
+                    })
         except Exception:
             pass
 
-    # 법령 원문 조회 (첫 번째 관련 법령의 주요 조문)
+    # 법령 원문 조회 (XML)
     law_text_snippet = ""
     if all_laws:
         mst = all_laws[0].get("mst", "")
         if mst:
             try:
-                resp = requests.get("https://www.law.go.kr/DRF/lawService.do", params={
-                    "OC": LAW_OC, "target": "law", "type": "JSON", "MST": mst
-                }, timeout=10)
-                if resp.status_code == 200:
-                    law_data = resp.json()
-                    # 조문 추출
-                    articles = law_data.get("법령", {}).get("조문", {}).get("조문단위", [])
-                    if isinstance(articles, dict):
-                        articles = [articles]
-                    # 핵심 조문 최대 10개
-                    snippets = []
-                    for art in articles[:30]:
-                        content = art.get("조문내용", "")
-                        if content and len(content) > 10:
-                            snippets.append(content.strip())
-                        if len(snippets) >= 10:
-                            break
-                    if snippets:
-                        law_text_snippet = f"\n\n【{all_laws[0]['name']} 주요 조문】\n" + "\n".join(snippets)
+                root = law_api_xml("law", mst=mst)
+                snippets = []
+                for art in root.findall(".//조문단위"):
+                    content = xml_find_text(art, "조문내용")
+                    if content and len(content) > 10:
+                        snippets.append(content.strip())
+                    if len(snippets) >= 10:
+                        break
+                if snippets:
+                    law_text_snippet = f"\n\n【{all_laws[0]['name']} 주요 조문】\n" + "\n".join(snippets)
             except Exception:
                 pass
 

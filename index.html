@@ -771,15 +771,16 @@ async function searchPrecedents() {
   content.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:10px;color:var(--light);">판례 검색 중...</p></div>';
 
   try {
-    const resp = await fetch(`${API_BASE}/precedents?q=${encodeURIComponent(query)}`, {signal: AbortSignal.timeout(10000)});
+    const resp = await fetch(`${API_BASE}/precedents?q=${encodeURIComponent(query)}`, {signal: AbortSignal.timeout(20000)});
     if (resp.ok) {
       const results = await resp.json();
       if (Array.isArray(results) && results.length > 0) {
-        content.innerHTML = results.map(r => `
+        content.innerHTML = `<p style="margin-bottom:12px;color:var(--light);font-size:0.85rem;">총 ${results.length}건의 판례</p>` + results.map(r => `
           <div class="result-card" style="border-left-color:#805ad5;">
             <h3><a href="${escHtml(r.link || '#')}" target="_blank">${escHtml(r.title || r.caseNo || '판례')}</a></h3>
             <div class="meta">
               <span class="tag" style="background:#faf5ff;color:#805ad5;">${escHtml(r.court || '법원')}</span>
+              ${r.type ? `<span class="tag" style="background:#f0fff4;color:#38a169;">${escHtml(r.type)}</span>` : ''}
               ${r.date ? `<span>선고일: ${escHtml(formatDate(r.date))}</span>` : ''}
               ${r.caseNo ? ` &middot; ${escHtml(r.caseNo)}` : ''}
             </div>
@@ -792,7 +793,7 @@ async function searchPrecedents() {
     console.log('판례 검색 오류:', e);
   }
 
-  content.innerHTML = `<div class="no-results"><div class="icon">&#9878;</div><p>"${escHtml(query)}" 판례를 찾을 수 없습니다.</p><p style="margin-top:8px;font-size:0.85rem;">법제처 API 키 등록 후 이용 가능합니다. <a href="https://www.law.go.kr/LSW/openApi.do" target="_blank">API 키 발급</a></p></div>`;
+  content.innerHTML = `<div class="no-results"><div class="icon">&#9878;</div><p>"${escHtml(query)}" 관련 판례를 찾지 못했습니다.</p><p style="margin-top:8px;font-size:0.85rem;">검색어를 바꿔서 다시 시도해 보세요. (예: 핵심 키워드 1~2개)</p></div>`;
 }
 
 // ==================== 법률 용어 사전 ====================
