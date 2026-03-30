@@ -102,8 +102,10 @@ nav a:hover, nav a.active { background: rgba(255,255,255,0.2); color: white; }
 .qa-item:last-child { border-bottom: none; }
 .qa-q { font-weight: 600; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 8px; }
 .qa-q::before { content: 'Q'; display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; background: var(--accent); color: white; border-radius: 50%; font-size: 0.8rem; font-weight: 700; }
-.qa-a { margin-left: 36px; padding: 14px; background: #f0fff4; border-radius: 10px; font-size: 0.9rem; border-left: 3px solid var(--success); }
+.qa-a { margin-left: 36px; padding: 18px; background: #f0fff4; border-radius: 10px; font-size: 0.9rem; border-left: 3px solid var(--success); white-space: pre-wrap; line-height: 1.7; }
 .qa-a::before { content: 'AI '; font-weight: 700; color: var(--success); }
+.qa-a a { color: var(--accent); text-decoration: underline; word-break: break-all; }
+.qa-a strong, .qa-a b { color: var(--primary); }
 .qa-time { margin-left: 36px; margin-top: 6px; font-size: 0.75rem; color: var(--light); }
 .qa-pending { margin-left: 36px; padding: 10px; background: #fffbeb; border-radius: 8px; font-size: 0.85rem; color: #92400e; }
 
@@ -643,8 +645,8 @@ function renderQA() {
       <div class="qa-q">${escHtml(item.question)}</div>
       <div class="qa-time">${escHtml(item.name)} &middot; ${escHtml(item.time)}</div>
       ${item.answer
-        ? `<div class="qa-a">${escHtml(item.answer)}</div>`
-        : `<div class="qa-pending">&#9203; AI 답변 생성 중...</div>`
+        ? `<div class="qa-a">${formatAnswer(item.answer)}</div>`
+        : `<div class="qa-pending">&#9203; 법제처 법령 검색 + AI 답변 생성 중... (최대 30초)</div>`
       }
     </div>
   `).join('');
@@ -666,15 +668,15 @@ async function submitQuestion() {
   localStorage.setItem('lawQA', JSON.stringify(qaItems));
   renderQA();
   document.getElementById('qaQuestion').value = '';
-  showToast('질문이 등록되었습니다. AI가 답변을 준비합니다.');
+  showToast('질문이 등록되었습니다. 법제처 법령을 검색하고 AI가 답변을 준비합니다.');
 
-  // Get AI answer
+  // Get AI answer (법제처 검색 + Gemini → 시간 더 필요)
   try {
     const resp = await fetch(`${API_BASE}/qa`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({question}),
-      signal: AbortSignal.timeout(15000)
+      body: JSON.stringify({question, name}),
+      signal: AbortSignal.timeout(60000)
     });
     if (resp.ok) {
       const data = await resp.json();
@@ -736,6 +738,21 @@ function escHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+// ==================== 답변 포맷팅 (마크다운 간이 변환) ====================
+function formatAnswer(text) {
+  if (!text) return '';
+  let s = escHtml(text);
+  // 【제목】 → 볼드
+  s = s.replace(/【([^】]+)】/g, '<strong style="color:var(--primary);font-size:1.02em;">【$1】</strong>');
+  // **bold**
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // 📜, ⚖️ 등 이모지 링크 라인
+  s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  // 줄바꿈
+  s = s.replace(/\n/g, '<br>');
+  return s;
 }
 
 // ==================== 판례 검색 ====================

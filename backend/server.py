@@ -411,30 +411,194 @@ def search_stats():
     })
 
 
-# ========== AI ANSWER ==========
+# ========== AI ANSWER (법제처 API 연동) ==========
+
+def extract_legal_keywords(question: str) -> list:
+    """질문에서 법률 검색 키워드 추출"""
+    # 주제별 키워드 매핑
+    keyword_map = {
+        "오피스텔|주거|상가|임대|임차|전세|월세|보증금|계약|집주인|세입자": ["주택임대차보호법", "상가건물임대차보호법", "민법 임대차"],
+        "해고|퇴직|임금|근로|노동|연장|야근|산재|실업": ["근로기준법", "노동"],
+        "이혼|양육|위자료|친권|재산분할|혼인": ["민법 혼인", "가사소송법"],
+        "사기|횡령|폭행|협박|명예훼손|고소|형사": ["형법", "형사소송법"],
+        "세금|양도|상속|증여|소득세|부가세|종합소득": ["소득세법", "상속세및증여세법"],
+        "파산|회생|채무|면책|빚|채권": ["채무자회생법", "민사집행법"],
+        "특허|발명|상표|저작권|디자인": ["특허법", "저작권법"],
+        "교통|음주|면허|사고|벌금|과태료": ["도로교통법", "교통사고처리특례법"],
+        "아파트|관리비|층간소음|재건축|분양": ["공동주택관리법", "주택법"],
+        "개인정보|프라이버시|정보보호": ["개인정보보호법"],
+        "소비자|환불|청약철회|하자": ["소비자기본법", "전자상거래법"],
+    }
+
+    keywords = []
+    q = question.lower()
+    for pattern, kws in keyword_map.items():
+        if re.search(pattern, q):
+            keywords.extend(kws)
+
+    # 매칭 안 되면 질문에서 명사 추출 (간단 휴리스틱)
+    if not keywords:
+        # 2글자 이상 단어를 키워드로
+        words = re.findall(r'[가-힣]{2,}', question)
+        keywords = words[:3] if words else [question[:10]]
+
+    return keywords[:5]
+
+
+def search_laws_for_qa(keywords: list) -> str:
+    """법제처 API로 관련 법령 검색 → 컨텍스트 텍스트 생성"""
+    all_laws = []
+    all_precs = []
+
+    for kw in keywords[:3]:  # 최대 3개 키워드 검색
+        # 법령 검색
+        try:
+            resp = requests.get(LAW_API_BASE, params={
+                "OC": LAW_OC, "target": "law", "type": "JSON",
+                "query": kw, "display": 5
+            }, timeout=8)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw = data.get("LawSearch", {}).get("law", [])
+                if isinstance(raw, dict):
+                    raw = [raw]
+                for l in raw:
+                    name = l.get("법령명한글", "")
+                    if name and name not in [x["name"] for x in all_laws]:
+                        all_laws.append({
+                            "name": name,
+                            "type": l.get("법령구분명", ""),
+                            "mst": l.get("법령일련번호", ""),
+                            "date": l.get("공포일자", ""),
+                        })
+        except Exception:
+            pass
+
+        # 판례 검색
+        try:
+            resp = requests.get(LAW_API_BASE, params={
+                "OC": LAW_OC, "target": "prec", "type": "JSON",
+                "query": kw, "display": 3
+            }, timeout=8)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw = data.get("PrecSearch", {}).get("prec", [])
+                if isinstance(raw, dict):
+                    raw = [raw]
+                for p in raw:
+                    case_name = p.get("사건명", "")
+                    if case_name:
+                        all_precs.append({
+                            "name": case_name,
+                            "court": p.get("법원명", ""),
+                            "date": p.get("선고일자", ""),
+                            "caseNo": p.get("사건번호", ""),
+                        })
+        except Exception:
+            pass
+
+    # 법령 원문 조회 (첫 번째 관련 법령의 주요 조문)
+    law_text_snippet = ""
+    if all_laws:
+        mst = all_laws[0].get("mst", "")
+        if mst:
+            try:
+                resp = requests.get("https://www.law.go.kr/DRF/lawService.do", params={
+                    "OC": LAW_OC, "target": "law", "type": "JSON", "MST": mst
+                }, timeout=10)
+                if resp.status_code == 200:
+                    law_data = resp.json()
+                    # 조문 추출
+                    articles = law_data.get("법령", {}).get("조문", {}).get("조문단위", [])
+                    if isinstance(articles, dict):
+                        articles = [articles]
+                    # 핵심 조문 최대 10개
+                    snippets = []
+                    for art in articles[:30]:
+                        content = art.get("조문내용", "")
+                        if content and len(content) > 10:
+                            snippets.append(content.strip())
+                        if len(snippets) >= 10:
+                            break
+                    if snippets:
+                        law_text_snippet = f"\n\n【{all_laws[0]['name']} 주요 조문】\n" + "\n".join(snippets)
+            except Exception:
+                pass
+
+    # 컨텍스트 조합
+    context_parts = []
+    if all_laws:
+        law_list = ", ".join([f"{l['name']}({l['type']})" for l in all_laws[:8]])
+        context_parts.append(f"【관련 법령】 {law_list}")
+    if all_precs:
+        prec_list = ", ".join([f"{p['name']}({p['court']}, {p['caseNo']})" for p in all_precs[:5]])
+        context_parts.append(f"【관련 판례】 {prec_list}")
+    if law_text_snippet:
+        context_parts.append(law_text_snippet)
+
+    return "\n".join(context_parts) if context_parts else "", all_laws
+
+
 def get_ai_answer(question: str) -> str:
+    """법제처 API 검색 → Gemini AI 답변 (실제 법령 데이터 기반)"""
+
+    # 1단계: 키워드 추출 & 법제처 검색
+    keywords = extract_legal_keywords(question)
+    law_context, found_laws = search_laws_for_qa(keywords)
+
     if not GEMINI_KEY:
         return get_rule_based_answer(question)
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
+
+        system_prompt = """당신은 대한민국 법률 전문 AI 상담사입니다.
+아래의 법제처(www.law.go.kr) 실제 법령 데이터를 기반으로 정확하고 구체적인 답변을 제공하세요.
+
+■ 답변 규칙:
+1. 반드시 관련 법률명과 조항 번호를 구체적으로 인용하세요 (예: 주택임대차보호법 제4조 제1항)
+2. 법조문의 핵심 내용을 쉬운 말로 풀어서 설명하세요
+3. 실용적 조언을 포함하세요 (신고 절차, 구제 기관, 비용, 기한 등)
+4. 관련 판례가 있으면 언급하세요
+5. 답변은 구조적으로 작성하세요:
+   【결론】 질문에 대한 명확한 답변 (가능/불가능, 조건 등)
+   【근거 법령】 구체적 법조문 인용 및 설명
+   【실무 조언】 실제 행동 가이드
+6. 1200자 이내로 답변하세요
+7. 한국어 존댓말 사용
+8. 마지막에 반드시 다음을 추가: "⚖️ 본 답변은 법제처 법령정보를 기반으로 한 AI 참고용이며, 구체적 사안은 전문가 상담을 권합니다."
+9. 모호하거나 확실하지 않은 부분은 솔직히 "이 부분은 구체적 상황에 따라 다를 수 있습니다"라고 밝히세요"""
+
+        user_prompt = f"""질문: {question}"""
+
+        if law_context:
+            user_prompt += f"\n\n=== 법제처 검색 결과 (실제 법령 데이터) ===\n{law_context}\n=== 검색 결과 끝 ==="
+        else:
+            user_prompt += "\n\n(법제처 검색 결과가 없습니다. 일반 법률 지식으로 답변하되, 반드시 관련 법령명을 언급하세요.)"
+
         payload = {
-            "contents": [{"parts": [{"text": f"""당신은 한국 법률 전문 AI 상담사입니다.
-
-규칙:
-1. 관련 법령을 구체적으로 인용 (법률명, 조항 번호)
-2. 실용적 조언 포함 (상담 기관, 절차)
-3. 500자 이내 답변
-4. 마지막에 "⚖️ 본 답변은 AI 참고용이며, 구체적 사안은 전문가 상담을 권합니다." 추가
-5. 한국어, 존댓말
-
-질문: {question}"""}]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1000}
+            "contents": [
+                {"role": "user", "parts": [{"text": user_prompt}]}
+            ],
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2500}
         }
-        resp = requests.post(url, json=payload, timeout=30)
+        resp = requests.post(url, json=payload, timeout=45)
         resp.raise_for_status()
         data = resp.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        answer = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        # 출처 법령 링크 추가
+        if found_laws:
+            source_links = []
+            for l in found_laws[:3]:
+                name = l.get("name", "")
+                if name:
+                    source_links.append(f"📜 {name}: https://www.law.go.kr/법령/{name}")
+            if source_links:
+                answer += "\n\n📚 참조 법령 링크:\n" + "\n".join(source_links)
+
+        return answer
     except Exception as e:
         print(f"Gemini error: {e}")
         return get_rule_based_answer(question)
